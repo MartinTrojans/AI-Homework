@@ -163,15 +163,17 @@ class Minimax:
         else:
             enemy = 'X'
 
+        action.getRaidGrids(player, state, raidGrids)
+        action.getFreeGrids(player, state, freeGrids)
+
         #if it's the utility node
-        if cutoff == 0:
+        if cutoff == 0 or len(freeGrids) == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
             self.bufferStore(location, self.depth, value)
             return value
 
-        action.getRaidGrids(player, state, raidGrids)
-        action.getFreeGrids(player, state, freeGrids)
+
 
 
         if cutoff > 0:
@@ -255,7 +257,7 @@ class Pruning:
             enemy = 'O'
 
         #if it's the utility node
-        if cutoff == 0:
+        if cutoff == 0 or len(freeGrids) == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
             self.bufferStore(location, self.depth, value, a, b)

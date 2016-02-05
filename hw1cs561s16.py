@@ -170,7 +170,7 @@ class Minimax:
         if cutoff == 0 or len(freeGrids) == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
-            self.bufferStore(location, self.depth, value)
+            self.bufferStore(location, self.depth-cutoff, value)
             return value
 
 
@@ -260,7 +260,7 @@ class Pruning:
         if cutoff == 0 or len(freeGrids) == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
-            self.bufferStore(location, self.depth, value, a, b)
+            self.bufferStore(location, self.depth-cutoff, value, a, b)
             return value
 
         action.getRaidGrids(player, state, raidGrids)

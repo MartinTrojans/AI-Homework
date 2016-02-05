@@ -1,4 +1,4 @@
 Node,Depth,Value
 root,0,-Infinity
-C3,2,62
+C3,1,62
 root,0,62

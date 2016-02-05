@@ -12,17 +12,26 @@ class Solution:
         cutoff = file.cutoff
         board = file.board
         state = file.state
-        filename = "trace_state.txt"
+        player1 = file.player1
+        player1al = file.player1al
+        player1cut = file.player1cut
+        player2 = file.player2
+        player2al = file.player2al
+        player2cut = file.player2cut
+        filename = "next_state.txt"
 
         if task == 1:
             g = Greedy()
-            file.write(filename, g.cal(player, board, state))
+            file.write(filename, g.cal(player, cutoff, board, state))
         elif task == 2:
             mm = Minimax()
             file.write(filename, mm.cal(player, cutoff, board, state))
         elif task == 3:
             p = Pruning()
             file.write(filename, p.cal(player, cutoff, board, state))
+        elif task == 4:
+            b = BattleSimulation()
+            b.battle(player1, player1al, player1cut, player2, player2al, player2cut, board, state)
 
 
 #operate the file including input and output
@@ -30,6 +39,12 @@ class FileOperator:
     task = None
     player = None
     cutoff = None
+    player1 = None
+    player1al = None
+    player1cut = None
+    player2 = None
+    player2al = None
+    player2cut = None
     board = []
     state = []
 
@@ -38,8 +53,16 @@ class FileOperator:
         file = open(filename, "r")
 
         self.task = int(file.readline().strip('\n'))
-        self.player = file.readline().strip('\n')
-        self.cutoff = int(file.readline().strip('\n'))
+        if self.task != 4:
+            self.player = file.readline().strip('\n')
+            self.cutoff = int(file.readline().strip('\n'))
+        else:
+            self.player1 = file.readline().strip('\n')
+            self.player1al = int(file.readline().strip('\n'))
+            self.player1cut = int(file.readline().strip('\n'))
+            self.player2 = file.readline().strip('\n')
+            self.player2al = int(file.readline().strip('\n'))
+            self.player2cut = int(file.readline().strip('\n'))
 
         for i in range(5):
             line = file.readline().strip('\n')
@@ -56,6 +79,7 @@ class FileOperator:
             for j in range(5):
                 stateline.append(line[j])
             self.state.append(stateline)
+
         file.close()
 
     def write(self, filename, res):
@@ -82,10 +106,14 @@ class FileOperator:
         file.writelines(buffer)
         file.close()
 
+    def recordBattle(self, filename, buffer):
+        file = open(filename, "w")
+        file.writelines(buffer[:len(buffer)-1])
+        file.close()
 
 #greedy best-first search
 class Greedy:
-    def cal(self, player, board, state):
+    def cal(self, player, cutoff, board, state):
         eva = Evaluation()
         action = Action()
         raidGrids = []
@@ -105,7 +133,7 @@ class Greedy:
                 temp[freeGrids[i][0]][freeGrids[i][1]] = player
                 value = eva.evaluation(player, board, temp)
             if value > bestValue:
-                maxRaid = value
+                bestValue = value
                 res = temp
 
         return res
@@ -152,13 +180,12 @@ class Minimax:
             if maxPlayer:#for max player
                 bestValue = -float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue)
-                for i in range(freeGrids.__len__()):
+                for i in range(len(freeGrids)):
+                    temp = copy.deepcopy(state)
                     if raidGrids.__contains__(freeGrids[i]):
-                        temp = copy.deepcopy(state)
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
                     else:
-                        temp = copy.deepcopy(state)
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
                     if value > bestValue:
@@ -171,13 +198,12 @@ class Minimax:
             else:#for min player
                 bestValue = float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue)
-                for i in range(freeGrids.__len__()):
+                for i in range(len(freeGrids)):
+                    temp = copy.deepcopy(state)
                     if raidGrids.__contains__(freeGrids[i]):
-                        temp = copy.deepcopy(state)
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
                     else:
-                        temp = copy.deepcopy(state)
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
                     if value < bestValue:
@@ -243,13 +269,12 @@ class Pruning:
             if maxPlayer:#for max player
                 bestValue = -float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
-                for i in range(freeGrids.__len__()):
+                for i in range(len(freeGrids)):
+                    temp = copy.deepcopy(state)
                     if raidGrids.__contains__(freeGrids[i]):
-                        temp = copy.deepcopy(state)
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
                     else:
-                        temp = copy.deepcopy(state)
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
 
@@ -270,13 +295,12 @@ class Pruning:
             else:#for min player
                 bestValue = float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
-                for i in range(freeGrids.__len__()):
+                for i in range(len(freeGrids)):
+                    temp = copy.deepcopy(state)
                     if raidGrids.__contains__(freeGrids[i]):
-                        temp = copy.deepcopy(state)
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
                     else:
-                        temp = copy.deepcopy(state)
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
 
@@ -324,6 +348,49 @@ class Pruning:
 
         self.buffer += line
 
+
+#simulate the battle
+class BattleSimulation:
+    buffer = ""
+    def battle(self, firstPlayer, p1al, p1cut, secondPlayer, p2al, p2cut, board, state):
+        filename = "trace_state.txt"
+        action = Action()
+        file = FileOperator()
+        curState = state
+        if p1al == 1:
+            p1 = Greedy()
+        elif p1al == 2:
+            p1 = Minimax()
+        else:
+            p1 = Pruning()
+        if p2al == 1:
+            p2 = Greedy()
+        elif p2al == 2:
+            p2 = Minimax()
+        else:
+            p2 = Pruning()
+
+        while(not action.checkEnd(curState)):
+            curState = p1.cal(firstPlayer, p1cut, board, curState)
+            self.bufferStore(curState)
+            if action.checkEnd(curState):
+                break
+            curState = p2.cal(secondPlayer, p2cut, board, curState)
+            self.bufferStore(curState)
+
+        file.recordBattle(filename, self.buffer)
+
+
+    def bufferStore(self, matrix):
+        l = 5
+        for i in range(l):
+            line = ""
+            for j in range(l):
+                line += matrix[i][j]
+            line += '\n'
+            self.buffer += line
+
+#some useful actions
 class Action:
     def getRaidGrids(self, player, state, raidGrids):
         l = 5
@@ -368,6 +435,13 @@ class Action:
                     if state[m+i][n+j] == enemy:
                         state[m+i][n+j] = player
 
+    def checkEnd(self, state):
+        for i in range(5):
+            for j in range(5):
+                if state[i][j] == '*':
+                    return False
+        return True
+
 
 #evaluation for the current state
 class Evaluation:
@@ -387,8 +461,6 @@ class Evaluation:
             return xcount - ocount
         elif player == 'O':
             return ocount - xcount
-        else:
-            return
 
 
 s = Solution()

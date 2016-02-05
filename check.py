@@ -14,5 +14,6 @@ class Check:
         return True
 
 c = Check()
-print(c.check("trace_state.txt", "contrast1.txt"))
+print(c.check("next_state.txt", "contrast1.txt"))
 print(c.check("traverse_log.txt", "contrast2.txt"))
+print(c.check("trace_state.txt", "contrast3.txt"))

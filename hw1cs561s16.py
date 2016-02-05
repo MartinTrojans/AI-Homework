@@ -22,13 +22,13 @@ class Solution:
 
         if task == 1:
             g = Greedy()
-            file.write(filename, g.cal(player, cutoff, board, state))
+            file.write(filename, g.cal(player, cutoff, board, state, False))
         elif task == 2:
             mm = Minimax()
-            file.write(filename, mm.cal(player, cutoff, board, state))
+            file.write(filename, mm.cal(player, cutoff, board, state, True))
         elif task == 3:
             p = Pruning()
-            file.write(filename, p.cal(player, cutoff, board, state))
+            file.write(filename, p.cal(player, cutoff, board, state, True))
         elif task == 4:
             b = BattleSimulation()
             b.battle(player1, player1al, player1cut, player2, player2al, player2cut, board, state)
@@ -113,7 +113,7 @@ class FileOperator:
 
 #greedy best-first search
 class Greedy:
-    def cal(self, player, cutoff, board, state):
+    def cal(self, player, cutoff, board, state, traverse):
         eva = Evaluation()
         action = Action()
         raidGrids = []
@@ -145,13 +145,14 @@ class Minimax:
     depth = None
     player = None
     buffer = ""
-    def cal(self, player, cutoff, board, state):
+    def cal(self, player, cutoff, board, state, traverse):
         file = FileOperator()
         filename = "traverse_log.txt"
         self.depth = cutoff
         self.player = player
         self.minimax(player, cutoff, board, state, True, [0, 0])
-        file.recordMinimax(filename, self.buffer)
+        if traverse:
+            file.recordMinimax(filename, self.buffer)
         return self.res
 
     def minimax(self, player, cutoff, board, state, maxPlayer, location):
@@ -235,13 +236,14 @@ class Pruning:
     depth = None
     player = None
     buffer = ""
-    def cal(self, player, cutoff, board, state):
+    def cal(self, player, cutoff, board, state, traverse):
         file = FileOperator()
         filename = "traverse_log.txt"
         self.depth = cutoff
         self.player = player
         self.pruning(player, cutoff, board, state, True, [0, 0], -float("inf"), float("inf"))
-        file.recordPruning(filename, self.buffer)
+        if traverse:
+            file.recordPruning(filename, self.buffer)
         return self.res
 
     def pruning(self, player, cutoff, board, state, maxPlayer, location, a, b):
@@ -371,11 +373,11 @@ class BattleSimulation:
             p2 = Pruning()
 
         while(not action.checkEnd(curState)):
-            curState = p1.cal(firstPlayer, p1cut, board, curState)
+            curState = p1.cal(firstPlayer, p1cut, board, curState, False)
             self.bufferStore(curState)
             if action.checkEnd(curState):
                 break
-            curState = p2.cal(secondPlayer, p2cut, board, curState)
+            curState = p2.cal(secondPlayer, p2cut, board, curState, False)
             self.bufferStore(curState)
 
         file.recordBattle(filename, self.buffer)

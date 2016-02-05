@@ -1,5 +1,3 @@
-import copy
-
 __author__ = 'Martin'
 
 #main function
@@ -125,7 +123,7 @@ class Greedy:
         action.getFreeGrids(player, state, freeGrids)
 
         for i in range(len(freeGrids)):
-            temp = copy.deepcopy(state)
+            temp = action.copyMatrix(state)
             if raidGrids.__contains__(freeGrids[i]):
                 action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                 value = eva.evaluation(player, board, temp)
@@ -182,7 +180,7 @@ class Minimax:
                 bestValue = -float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue)
                 for i in range(len(freeGrids)):
-                    temp = copy.deepcopy(state)
+                    temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
@@ -200,7 +198,7 @@ class Minimax:
                 bestValue = float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue)
                 for i in range(len(freeGrids)):
-                    temp = copy.deepcopy(state)
+                    temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
@@ -272,7 +270,7 @@ class Pruning:
                 bestValue = -float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
                 for i in range(len(freeGrids)):
-                    temp = copy.deepcopy(state)
+                    temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
@@ -298,7 +296,7 @@ class Pruning:
                 bestValue = float('inf')
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
                 for i in range(len(freeGrids)):
-                    temp = copy.deepcopy(state)
+                    temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
@@ -444,6 +442,8 @@ class Action:
                     return False
         return True
 
+    def copyMatrix(self, matrix):
+        return [r[:] for r in matrix]
 
 #evaluation for the current state
 class Evaluation:

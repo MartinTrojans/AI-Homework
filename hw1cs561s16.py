@@ -1,3 +1,5 @@
+import time
+
 __author__ = 'Martin'
 
 #main function
@@ -163,16 +165,22 @@ class Minimax:
         else:
             enemy = 'X'
 
-        action.getRaidGrids(player, state, raidGrids)
-        action.getFreeGrids(player, state, freeGrids)
 
         #if it's the utility node
-        if cutoff == 0 or len(freeGrids) == 0:
+        if cutoff == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
             self.bufferStore(location, self.depth-cutoff, value)
             return value
 
+        action.getRaidGrids(player, state, raidGrids)
+        action.getFreeGrids(player, state, freeGrids)
+
+        if len(freeGrids) == 0:
+            eva = Evaluation()
+            value  = eva.evaluation(self.player, board, state)
+            self.bufferStore(location, self.depth-cutoff, value)
+            return value
 
 
 
@@ -185,10 +193,10 @@ class Minimax:
                     temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
-                        value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
+                        value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     else:
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
-                        value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
+                        value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     if value > bestValue:
                         bestValue = value
                         if cutoff == self.depth:
@@ -203,10 +211,10 @@ class Minimax:
                     temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
-                        value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
+                        value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     else:
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
-                        value = self.minimax(enemy, cutoff-1, board, temp, False, freeGrids[i])
+                        value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     if value < bestValue:
                         bestValue = value
                         if cutoff == self.depth:
@@ -257,7 +265,7 @@ class Pruning:
             enemy = 'O'
 
         #if it's the utility node
-        if cutoff == 0 or len(freeGrids) == 0:
+        if cutoff == 0:
             eva = Evaluation()
             value  = eva.evaluation(self.player, board, state)
             self.bufferStore(location, self.depth-cutoff, value, a, b)
@@ -265,6 +273,13 @@ class Pruning:
 
         action.getRaidGrids(player, state, raidGrids)
         action.getFreeGrids(player, state, freeGrids)
+
+        if len(freeGrids) == 0:
+            eva = Evaluation()
+            value  = eva.evaluation(self.player, board, state)
+            self.bufferStore(location, self.depth-cutoff, value, a, b)
+            return value
+
 
         if cutoff > 0:
 
@@ -275,10 +290,10 @@ class Pruning:
                     temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
-                        value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
+                        value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
                     else:
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
-                        value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
+                        value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
 
                     if value > bestValue:
                         bestValue = value
@@ -301,10 +316,10 @@ class Pruning:
                     temp = action.copyMatrix(state)
                     if raidGrids.__contains__(freeGrids[i]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
-                        value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
+                        value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
                     else:
                         temp[freeGrids[i][0]][freeGrids[i][1]] = player
-                        value = self.pruning(enemy, cutoff-1, board, temp, False, freeGrids[i], a, b)
+                        value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
 
                     if value < bestValue:
                         bestValue = value
@@ -394,21 +409,35 @@ class BattleSimulation:
 
 #some useful actions
 class Action:
+
     def getRaidGrids(self, player, state, raidGrids):
         l = 5
         #keep the order, from top left to bottom right mentioned in the rules
         for i in range(l):
             for j in range(l):
-                if state[i][j] == player:
-                    self.check(state, i, j, raidGrids)
-
-    def getSneakGrids(self, player, state, raidGrids, sneakGrids):
-        l = 5
-        #keep the order, from top left to bottom right mentioned in the rules
-        for i in range(l):
-            for j in range(l):
-                if state[i][j] == '*' and not raidGrids.__contains__([i, j]):
-                    sneakGrids.append([i, j])
+                if state[i][j] == "*":
+                    if i == 0:
+                        if state[i+1][j] == player:
+                            raidGrids.append([i,j])
+                            break
+                    elif i == l-1:
+                        if state[i-1][j] == player:
+                            raidGrids.append([i,j])
+                            break
+                    elif state[i+1][j] == player or state[i-1][j] == player:
+                        raidGrids.append([i,j])
+                        break
+                    if j == 0:
+                        if state[i][j+1] == player:
+                            raidGrids.append([i,j])
+                            break
+                    elif j == l-1:
+                        if state[i][j-1] == player:
+                            raidGrids.append([i,j])
+                            break
+                    elif state[i][j+1] == player or state[i][j-1] == player:
+                        raidGrids.append([i,j])
+                        break
 
     def getFreeGrids(self, player, state, freeGrids):
         l = 5
@@ -417,13 +446,28 @@ class Action:
             for j in range(l):
                 if state[i][j] == '*':
                     freeGrids.append([i, j])
-
+    """
+    def getSneakGrids(self, player, state, raidGrids, sneakGrids):
+        l = 5
+        #keep the order, from top left to bottom right mentioned in the rules
+        for i in range(l):
+            for j in range(l):
+                if state[i][j] == '*' and not raidGrids.__contains__([i, j]):
+                    sneakGrids.append([i, j])
+    def getRaidGrids1(self, player, state, raidGrids):
+        l = 5
+        #keep the order, from top left to bottom right mentioned in the rules
+        for i in range(l):
+            for j in range(l):
+                if state[i][j] == player:
+                    self.check(state, i, j, raidGrids)
     def check(self, state, m, n, res):
         for i in range(-1, 2):
             for j in range(-1, 2):
                 if m+i >=0 and n+j >=0 and m+i<5 and n+j<5 and (i+j==1 or i+j==-1):
                     if state[m+i][n+j] == '*' and not res.__contains__([m+i, n+j]):
                         res.append([m+i, n+j])
+    """
 
     def raid(self, player, state, m, n):
         state[m][n] = player
@@ -466,6 +510,8 @@ class Evaluation:
         elif player == 'O':
             return ocount - xcount
 
-
+time1 = time.time()
 s = Solution()
 s.main()
+time2 = time.time()
+print(time2 - time1)

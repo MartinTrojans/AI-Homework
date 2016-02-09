@@ -1,10 +1,8 @@
 import sys
-import time
-
-__author__ = 'Martin'
 
 #main function
 class Solution:
+    inFilename = ""
     def __init__(self, inFilename):
         self.inFilename = inFilename
     def main(self):
@@ -54,20 +52,20 @@ class FileOperator:
     def read(self, inFilename):
         file = open(inFilename, "r")
 
-        self.task = int(file.readline().strip('\n'))
+        self.task = int(file.readline().strip())
         if self.task != 4:
-            self.player = file.readline().strip('\n')
-            self.cutoff = int(file.readline().strip('\n'))
+            self.player = file.readline().strip()
+            self.cutoff = int(file.readline().strip())
         else:
-            self.player1 = file.readline().strip('\n')
-            self.player1al = int(file.readline().strip('\n'))
-            self.player1cut = int(file.readline().strip('\n'))
-            self.player2 = file.readline().strip('\n')
-            self.player2al = int(file.readline().strip('\n'))
-            self.player2cut = int(file.readline().strip('\n'))
+            self.player1 = file.readline().strip()
+            self.player1al = int(file.readline().strip())
+            self.player1cut = int(file.readline().strip())
+            self.player2 = file.readline().strip()
+            self.player2al = int(file.readline().strip())
+            self.player2cut = int(file.readline().strip())
 
         for i in range(5):
-            line = file.readline().strip('\n')
+            line = file.readline().strip()
             boardline = line.split(" ")
             self.board.append(boardline)
 
@@ -76,7 +74,7 @@ class FileOperator:
                 self.board[i][j] = int(self.board[i][j])
 
         for i in range(5):
-            line = file.readline().strip('\n')
+            line = file.readline().strip()
             stateline = []
             for j in range(5):
                 stateline.append(line[j])
@@ -118,17 +116,15 @@ class Greedy:
     def cal(self, player, cutoff, board, state, traverse):
         eva = Evaluation()
         action = Action()
-        raidGrids = []
         freeGrids = []
         res = []
         bestValue = -float("inf")
 
-        action.getRaidGrids(player, state, raidGrids)
         action.getFreeGrids(player, state, freeGrids)
 
         for i in range(len(freeGrids)):
             temp = action.copyMatrix(state)
-            if raidGrids.__contains__(freeGrids[i]):
+            if action.canRaid(player, state, freeGrids[i][0], freeGrids[i][1]):
                 action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                 value = eva.evaluation(player, board, temp)
             else:
@@ -136,7 +132,7 @@ class Greedy:
                 value = eva.evaluation(player, board, temp)
             if value > bestValue:
                 bestValue = value
-                res = temp
+                res = action.copyMatrix(temp)
 
         return res
 
@@ -159,7 +155,6 @@ class Minimax:
 
     def minimax(self, player, cutoff, board, state, maxPlayer, location):
         action = Action()
-        raidGrids = []
         freeGrids = []
 
         if player == 'X':
@@ -175,7 +170,6 @@ class Minimax:
             self.bufferStore(location, self.depth-cutoff, value)
             return value
 
-        action.getRaidGrids(player, state, raidGrids)
         action.getFreeGrids(player, state, freeGrids)
 
         if len(freeGrids) == 0:
@@ -193,7 +187,7 @@ class Minimax:
                 self.bufferStore(location, self.depth-cutoff, bestValue)
                 for i in range(len(freeGrids)):
                     temp = action.copyMatrix(state)
-                    if raidGrids.__contains__(freeGrids[i]):
+                    if action.canRaid(player, state, freeGrids[i][0], freeGrids[i][1]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     else:
@@ -202,7 +196,7 @@ class Minimax:
                     if value > bestValue:
                         bestValue = value
                         if cutoff == self.depth:
-                            self.res = temp
+                            self.res = action.copyMatrix(temp)
                     self.bufferStore(location, self.depth-cutoff, bestValue)
                 return bestValue
 
@@ -211,7 +205,7 @@ class Minimax:
                 self.bufferStore(location, self.depth-cutoff, bestValue)
                 for i in range(len(freeGrids)):
                     temp = action.copyMatrix(state)
-                    if raidGrids.__contains__(freeGrids[i]):
+                    if action.canRaid(player, state, freeGrids[i][0], freeGrids[i][1]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.minimax(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i])
                     else:
@@ -220,7 +214,7 @@ class Minimax:
                     if value < bestValue:
                         bestValue = value
                         if cutoff == self.depth:
-                            self.res = temp
+                            self.res = action.copyMatrix(temp)
                     self.bufferStore(location, self.depth-cutoff, bestValue)
                 return bestValue
 
@@ -258,7 +252,6 @@ class Pruning:
 
     def pruning(self, player, cutoff, board, state, maxPlayer, location, a, b):
         action = Action()
-        raidGrids = []
         freeGrids = []
 
         if player == 'O':
@@ -273,7 +266,6 @@ class Pruning:
             self.bufferStore(location, self.depth-cutoff, value, a, b)
             return value
 
-        action.getRaidGrids(player, state, raidGrids)
         action.getFreeGrids(player, state, freeGrids)
 
         if len(freeGrids) == 0:
@@ -290,7 +282,7 @@ class Pruning:
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
                 for i in range(len(freeGrids)):
                     temp = action.copyMatrix(state)
-                    if raidGrids.__contains__(freeGrids[i]):
+                    if action.canRaid(player, state, freeGrids[i][0], freeGrids[i][1]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
                     else:
@@ -300,7 +292,7 @@ class Pruning:
                     if value > bestValue:
                         bestValue = value
                         if cutoff == self.depth:
-                            self.res = temp
+                            self.res = action.copyMatrix(temp)
 
                     if bestValue >= b:
                         self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
@@ -316,7 +308,7 @@ class Pruning:
                 self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
                 for i in range(len(freeGrids)):
                     temp = action.copyMatrix(state)
-                    if raidGrids.__contains__(freeGrids[i]):
+                    if action.canRaid(player, state, freeGrids[i][0], freeGrids[i][1]):
                         action.raid(player, temp, freeGrids[i][0], freeGrids[i][1])
                         value = self.pruning(enemy, cutoff-1, board, temp, not maxPlayer, freeGrids[i], a, b)
                     else:
@@ -326,7 +318,7 @@ class Pruning:
                     if value < bestValue:
                         bestValue = value
                         if cutoff == self.depth:
-                            self.res = temp
+                            self.res = action.copyMatrix(temp)
 
                     if bestValue <= a:
                         self.bufferStore(location, self.depth-cutoff, bestValue, a, b)
@@ -399,7 +391,6 @@ class BattleSimulation:
 
         file.recordBattle(filename, self.buffer)
 
-
     def bufferStore(self, matrix):
         l = 5
         for i in range(l):
@@ -414,7 +405,6 @@ class Action:
 
     def getRaidGrids(self, player, state, raidGrids):
         l = 5
-        #keep the order, from top left to bottom right mentioned in the rules
         for i in range(l):
             for j in range(l):
                 if state[i][j] == "*":
@@ -454,28 +444,6 @@ class Action:
         if i < 4 and state[i+1][j] == player: return True
         if j > 0 and state[i][j-1] == player: return True
         if j < 4 and state[i][j+1] == player: return True
-    """
-    def getSneakGrids(self, player, state, raidGrids, sneakGrids):
-        l = 5
-        #keep the order, from top left to bottom right mentioned in the rules
-        for i in range(l):
-            for j in range(l):
-                if state[i][j] == '*' and not raidGrids.__contains__([i, j]):
-                    sneakGrids.append([i, j])
-    def getRaidGrids1(self, player, state, raidGrids):
-        l = 5
-        #keep the order, from top left to bottom right mentioned in the rules
-        for i in range(l):
-            for j in range(l):
-                if state[i][j] == player:
-                    self.check(state, i, j, raidGrids)
-    def check(self, state, m, n, res):
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                if m+i >=0 and n+j >=0 and m+i<5 and n+j<5 and (i+j==1 or i+j==-1):
-                    if state[m+i][n+j] == '*' and not res.__contains__([m+i, n+j]):
-                        res.append([m+i, n+j])
-    """
 
     def raid(self, player, state, m, n):
         state[m][n] = player
@@ -518,12 +486,6 @@ class Evaluation:
         elif player == 'O':
             return ocount - xcount
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "-i":
-        sys.exit()
-    else:
-        time1 = time.time()
-        s = Solution(sys.argv[2])
-        s.main()
-        time2 = time.time()
-        print(time2 - time1)
+if __name__ == '__main__':
+    s = Solution(sys.argv[2])
+    s.main()

@@ -1,12 +1,15 @@
+import sys
 import time
 
 __author__ = 'Martin'
 
 #main function
 class Solution:
+    def __init__(self, inFilename):
+        self.inFilename = inFilename
     def main(self):
         file = FileOperator()
-        file.read()
+        file.read(self.inFilename)
         task = file.task
         player = file.player
         cutoff = file.cutoff
@@ -48,9 +51,8 @@ class FileOperator:
     board = []
     state = []
 
-    def read(self):
-        filename = 'input.txt'
-        file = open(filename, "r")
+    def read(self, inFilename):
+        file = open(inFilename, "r")
 
         self.task = int(file.readline().strip('\n'))
         if self.task != 4:
@@ -446,6 +448,12 @@ class Action:
             for j in range(l):
                 if state[i][j] == '*':
                     freeGrids.append([i, j])
+
+    def canRaid(self, player, state, i, j):
+        if i > 0 and state[i-1][j] == player: return True
+        if i < 4 and state[i+1][j] == player: return True
+        if j > 0 and state[i][j-1] == player: return True
+        if j < 4 and state[i][j+1] == player: return True
     """
     def getSneakGrids(self, player, state, raidGrids, sneakGrids):
         l = 5
@@ -510,8 +518,12 @@ class Evaluation:
         elif player == 'O':
             return ocount - xcount
 
-time1 = time.time()
-s = Solution()
-s.main()
-time2 = time.time()
-print(time2 - time1)
+if __name__ == "__main__":
+    if len(sys.argv) != 3 or sys.argv[1] != "-i":
+        sys.exit()
+    else:
+        time1 = time.time()
+        s = Solution(sys.argv[2])
+        s.main()
+        time2 = time.time()
+        print(time2 - time1)

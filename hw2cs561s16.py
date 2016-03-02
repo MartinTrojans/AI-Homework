@@ -1,3 +1,4 @@
+import copy
 import sys
 
 __author__ = 'Martin'
@@ -12,7 +13,7 @@ class Solution:
         s = FOLBC()
         kb = KB()
         f.read(self.filename, kb)
-        s.BCOr(kb, kb.goal)
+        s.BCask(kb, kb.goal)
         f.write("output.txt", s.buffer)
 
 
@@ -47,7 +48,7 @@ class FIO:
             negation = False
         strs = pre.split("(")
         name = strs[0].strip()
-        vars = strs[1][:len(strs[1])-1].strip(", ")
+        vars = strs[1][:len(strs[1])-1].split(", ")
         for var in vars:
             if var[0].islower():
                 value = False
@@ -73,10 +74,16 @@ class Predicate:
         return self.name == other.name
 
     def __eq__(self, other):
-        return self.name == other.name and self.vars == other.vars and self.negation == other.negation
+        return self.name == other.name and self.vars == other.vars and self.negation == other.negation and self.value == other.value
 
     def toString(self):
-        return ["~" + self.name + "(" + self.vars.join(", ") + ")", self.name + "(" + self.vars.join(", ") + ")"][self.negation is True]
+        negPart = "~" if self.negation else ""
+        namePart = self.name
+        varSegements = []
+        for var in self.vars:
+            varSegements.append("_") if var[0].islower() else varSegements.append(var)
+        varPart = ", ".join(varSegements)
+        return negPart + namePart + "(" + varPart + ")"
 
 class Implication:
     def __init__(self, lhs, rhs):
@@ -94,50 +101,90 @@ class FOLBC:
 
     def BCOr(self, kb, goal, theta):
         self.buffer += "Ask: " + goal.toString() + "\n"
-        res = {}
-        if kb.mathGoal(goal):
+        if kb.matchGoal(goal):
             self.buffer += "True: " + goal.toString() + "\n"
             return theta
-        for rules in self.fetch(kb, goal):
-            for imp in rules:
-                newTheta = self.unify(imp.rhs, goal)
-                for subs in self.BCAnd(kb, imp.lhs, theta + newTheta):
-                    res += subs
-        return res
+        for imp in self.fetch(kb, goal):
+            self.standardize(imp, goal, theta)
+            newTheta = self.unify(imp.rhs, goal)
+            subs = self.BCAnd(kb, imp.lhs, dict(theta, **newTheta))
+            self.sub(goal, subs)
+            if goal.value:
+                self.buffer += "True: " + goal.toString() + "\n"
+                if goal == kb.goal:
+                    self.buffer += "True\n"
+        return subs
 
     def BCAnd(self, kb, goals, theta):
         if len(theta) == 0:
             return
         if len(goals) == 0:
             return theta
-        res = {}
         first = goals[0]
         rest = goals[1:]
-        for theta1 in self.BCOr(kb, self.subst(theta, first), theta):
-            for theta2 in self.BCAnd(kb, rest, theta1):
-                res += theta2
-        return res
+        theta1 = self.BCOr(kb, self.subst(theta, first), theta)
+        newTheta = self.BCAnd(kb, rest, theta1)
+        return newTheta
 
     def fetch(self, kb, goal):
         res = []
         for imp in kb.implications:
             if imp.rhs.match(goal):
                 res.append(imp)
+        for pre in kb.predicates:
+            if pre.match(goal):
+                res.append(Implication([], pre))
         return res
+
+    def standardize(self, imp, goal, theta):
+        if goal.value:
+            return
+        map = {}
+        for idx, var in enumerate(goal.vars):
+            if var[0].islower() and imp.rhs.vars[idx][0].islower():
+                map[imp.rhs.vars[idx]] = var
+                imp.rhs.vars[idx] = var
+            if var in theta.values():
+                map[imp.rhs.vars[idx]] = list(theta.keys())[list(theta.values()).index(var)]
+                if imp.rhs.vars[idx][0].islower():
+                    imp.rhs.vars[idx] = list(theta.keys())[list(theta.values()).index(var)]
+        for i in range(len(imp.lhs)):
+            for j in range(len(imp.lhs[i].vars)):
+                if imp.lhs[i].vars[j] in map.keys() and imp.lhs[i].vars[j][0].islower():
+                    imp.lhs[i].vars[j] = map.get(imp.lhs[i].vars[j])
 
     def unify(self, rhs, goal):
         newTheta = {}
-        for idx, var in rhs.vars:
-            if var[0].islower():
-                newTheta[var] = goal.vars[idx]
+        for idx in range(len(goal.vars)):
+            if goal.vars[idx][0].islower() and rhs.vars[idx][0]:
+                newTheta[goal.vars[idx]] = rhs.vars[idx]
+                goal.vars[idx] = rhs.vars[idx]
+            elif goal.vars[idx][0].isupper() and rhs.vars[idx][0].islower:
+                newTheta[rhs.vars[idx]] = goal.vars[idx]
+                rhs.vars[idx] = goal.vars[idx]
         return newTheta
 
     def subst(self, theta, alpha):
-        for var in alpha.vars:
-            if var[0].islower() and theta.has_key(var):
-                var = theta.get(var) #it will change the value of the alpha?
-        return alpha
+        nalpha = copy.deepcopy(alpha)
+        for idx, var in enumerate(alpha.vars):
+            if var[0].islower() and var in theta.keys(): #theta.has_key(var)
+                nalpha.vars[idx] = theta.get(var)
+        nalpha.value = True
+        for var in nalpha.vars:
+            if var[0].islower():
+                nalpha.value = False
+                break
+        return nalpha
 
+    def sub(self, goal, theta):
+        for idx, var in enumerate(goal.vars):
+            if var in theta.keys():
+                goal.vars[idx] = theta.get(var)
+        goal.value = True
+        for var in goal.vars:
+            if var[0].islower():
+                goal.value = False
+                break
 
 class KB:
 
@@ -159,12 +206,12 @@ class KB:
     def storeSubstitution(self, substitution):
         self.substitutions += substitution
 
-    def mathGoal(self, goal):
-        for pre in predicates:
+    def matchGoal(self, goal):
+        for pre in self.predicates:
             if pre == goal:
                 return True
         return False
 
 #s = Solution(sys.argv[2])
-s = Solution("sample1.out.txt")
+s = Solution("sample01.txt")
 s.main()

@@ -1,3 +1,4 @@
+from collections import Set
 import copy
 import sys
 
@@ -13,7 +14,7 @@ class Solution:
         s = FOLBC()
         kb = KB()
         f.read(self.filename, kb)
-        s.BCask(kb, kb.goal)
+        s.BCask(kb, kb.goals)
         f.write("output.txt", s.buffer)
 
 
@@ -22,7 +23,9 @@ class FIO:
     def read(self, fileName, kb):
         file = open(fileName, "r")
 
-        kb.storeGoal(self.parserPre(file.readline().strip()))
+        goals = file.readline().strip().split(" && ")
+        for goal in goals:
+            kb.storeGoal(self.parserPre(goal))
         num = int(file.readline().strip())
 
         while num > 0:
@@ -97,7 +100,7 @@ class FOLBC:
         self.buffer = ""
 
     def BCask(self, kb, query):
-        ans = self.BCOr(kb, query, {})
+        ans = self.BCAnd(kb, query, {})
         self.buffer += str(ans[0])
 
     def BCOr(self, kb, goal, theta):
@@ -111,7 +114,7 @@ class FOLBC:
             imp = copy.deepcopy(imp)
             self.buffer += "Ask: " + goal.toString() + "\n"
             self.standardize(imp, goal, theta)
-            newTheta = self.unify(imp.rhs, goal)
+            newTheta = self.unify(imp.rhs.vars, goal.vars, copy.deepcopy(theta))
             ans = self.BCAnd(kb, imp.lhs, dict(theta, **newTheta))
             hasImp = ans[0]
             subs = ans[1]
@@ -125,7 +128,7 @@ class FOLBC:
 
         if not hasImp:
             self.buffer += "False: " + goal.toString() + "\n"
-            return [False, subs]
+            return [False, theta]
 
     def BCAnd(self, kb, goals, theta):
         if len(goals) == 0:
@@ -133,8 +136,11 @@ class FOLBC:
         first = goals[0]
         rest = goals[1:]
         ans1 = self.BCOr(kb, self.subst(theta, first), theta)
-        ans2 = self.BCAnd(kb, rest, ans1[1])
-        return [ans1[0] & ans2[0], ans2[1]]
+        if ans1[0]:
+            ans2 = self.BCAnd(kb, rest, ans1[1])
+            return [ans2[0], ans2[1]]
+        else:
+            return [False, theta]
 
     def fetch(self, kb, goal):
         res = []
@@ -145,7 +151,7 @@ class FOLBC:
             if pre.match(goal):
                 res.append(Implication([], pre))
         return res
-
+    '''
     def standardize(self, imp, goal, theta):
         if theta is None:
             return
@@ -162,7 +168,34 @@ class FOLBC:
             for j in range(len(imp.lhs[i].vars)):
                 if imp.lhs[i].vars[j] in map.keys() and imp.lhs[i].vars[j][0].islower():
                     imp.lhs[i].vars[j] = map.get(imp.lhs[i].vars[j])
+    '''
 
+    def standardize(self, imp, goal, theta):
+        if theta is None:
+            return
+        map = {}
+        set = []
+        for idx in range(len(goal.vars)):
+            if goal.vars[idx][0].islower() and set.__contains__(goal.vars[idx]):
+                goal.vars[idx] = imp.rhs.vars[idx]
+            elif goal.vars[idx][0].islower() and imp.rhs.vars[idx][0].islower():
+                map[imp.rhs.vars[idx]] = goal.vars[idx]
+                imp.rhs.vars[idx] = goal.vars[idx]
+                set.append(goal.vars[idx])
+            elif goal.vars[idx] in theta.values():
+                map[imp.rhs.vars[idx]] = list(theta.keys())[list(theta.values()).index(goal.vars[idx])]
+                if imp.rhs.vars[idx][0].islower():
+                    imp.rhs.vars[idx] = list(theta.keys())[list(theta.values()).index(goal.vars[idx])]
+            if goal.vars[idx][0].islower():
+                set.append(goal.vars[idx])
+            elif imp.rhs.vars[idx][0].islower():
+                set.append(imp.rhs.vars[idx])
+        for i in range(len(imp.lhs)):
+            for j in range(len(imp.lhs[i].vars)):
+                if imp.lhs[i].vars[j] in map.keys() and imp.lhs[i].vars[j][0].islower():
+                    imp.lhs[i].vars[j] = map.get(imp.lhs[i].vars[j])
+
+    '''
     def unify(self, rhs, goal):
         newTheta = {}
         for idx in range(len(goal.vars)):
@@ -173,6 +206,29 @@ class FOLBC:
                 newTheta[rhs.vars[idx]] = goal.vars[idx]
                 rhs.vars[idx] = goal.vars[idx]
         return newTheta
+    '''
+    def unify(self, rhs, goal, theta):
+        if rhs == goal:
+            return theta
+        if len(rhs) > 1:
+            return self.unify(rhs[1:], goal[1:], self.unify([rhs[0]], [goal[0]], theta))
+        if rhs[0][0].islower():
+            return self.unifyVar(rhs[0], goal[0], theta)
+        if goal[0][0].islower():
+            return self.unifyVar(goal[0], rhs[0], theta)
+        return {}
+
+    def unifyVar(self, var, x, theta):
+        if theta is None or len(theta) == 0:
+            theta[var] = x
+            return theta
+        if var in theta.keys():
+            return self.unify([theta.get(var)], [x], theta)
+        if x in theta.keys():
+            return self.unify([var], [theta.get(x)], theta)
+        theta[var] = x
+        return theta
+
 
     def subst(self, theta, alpha):
         if theta is None or len(theta) == 0:
@@ -192,13 +248,13 @@ class FOLBC:
 class KB:
 
     def __init__(self):
-        self.goal = None
+        self.goals = []
         self.implications = []
         self.predicates = []
         self.substitutions = {}
 
     def storeGoal(self, goal):
-        self.goal = goal
+        self.goals.append(goal)
 
     def storeImplication(self, implication):
         self.implications.append(implication)
@@ -216,5 +272,5 @@ class KB:
         return False
 
 #s = Solution(sys.argv[2])
-s = Solution("sample03.txt")
+s = Solution("sample04.txt")
 s.main()

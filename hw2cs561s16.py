@@ -74,7 +74,7 @@ class Predicate:
         return self.name == other.name
 
     def __eq__(self, other):
-        return self.name == other.name and self.vars == other.vars and self.negation == other.negation and self.value == other.value
+        return self.name == other.name and self.vars == other.vars and self.negation == other.negation
 
     def toString(self):
         negPart = "~" if self.negation else ""
@@ -97,34 +97,44 @@ class FOLBC:
         self.buffer = ""
 
     def BCask(self, kb, query):
-        return self.BCOr(kb, query, {})
+        ans = self.BCOr(kb, query, {})
+        self.buffer += str(ans[0])
 
     def BCOr(self, kb, goal, theta):
-        self.buffer += "Ask: " + goal.toString() + "\n"
+        hasImp = False
         if kb.matchGoal(goal):
+            self.buffer += "Ask: " + goal.toString() + "\n"
             self.buffer += "True: " + goal.toString() + "\n"
-            return theta
+            return [True, theta]
+
         for imp in self.fetch(kb, goal):
+            imp = copy.deepcopy(imp)
+            self.buffer += "Ask: " + goal.toString() + "\n"
             self.standardize(imp, goal, theta)
             newTheta = self.unify(imp.rhs, goal)
-            subs = self.BCAnd(kb, imp.lhs, dict(theta, **newTheta))
-            self.sub(goal, subs)
-            if goal.value:
+            ans = self.BCAnd(kb, imp.lhs, dict(theta, **newTheta))
+            hasImp = ans[0]
+            subs = ans[1]
+            goal = self.subst(subs, goal)
+            tempsub = self.subst(subs, imp.rhs)
+            if goal != tempsub:
+                hasImp = False
+            if hasImp:
                 self.buffer += "True: " + goal.toString() + "\n"
-                if goal == kb.goal:
-                    self.buffer += "True\n"
-        return subs
+                return [True, subs]
+
+        if not hasImp:
+            self.buffer += "False: " + goal.toString() + "\n"
+            return [False, subs]
 
     def BCAnd(self, kb, goals, theta):
-        if len(theta) == 0:
-            return
         if len(goals) == 0:
-            return theta
+            return [True, theta]
         first = goals[0]
         rest = goals[1:]
-        theta1 = self.BCOr(kb, self.subst(theta, first), theta)
-        newTheta = self.BCAnd(kb, rest, theta1)
-        return newTheta
+        ans1 = self.BCOr(kb, self.subst(theta, first), theta)
+        ans2 = self.BCAnd(kb, rest, ans1[1])
+        return [ans1[0] & ans2[0], ans2[1]]
 
     def fetch(self, kb, goal):
         res = []
@@ -137,7 +147,7 @@ class FOLBC:
         return res
 
     def standardize(self, imp, goal, theta):
-        if goal.value:
+        if theta is None:
             return
         map = {}
         for idx, var in enumerate(goal.vars):
@@ -156,15 +166,17 @@ class FOLBC:
     def unify(self, rhs, goal):
         newTheta = {}
         for idx in range(len(goal.vars)):
-            if goal.vars[idx][0].islower() and rhs.vars[idx][0]:
+            if goal.vars[idx][0].islower() and rhs.vars[idx][0].isupper():
                 newTheta[goal.vars[idx]] = rhs.vars[idx]
                 goal.vars[idx] = rhs.vars[idx]
-            elif goal.vars[idx][0].isupper() and rhs.vars[idx][0].islower:
+            elif goal.vars[idx][0].isupper() and rhs.vars[idx][0].islower():
                 newTheta[rhs.vars[idx]] = goal.vars[idx]
                 rhs.vars[idx] = goal.vars[idx]
         return newTheta
 
     def subst(self, theta, alpha):
+        if theta is None or len(theta) == 0:
+            return alpha
         nalpha = copy.deepcopy(alpha)
         for idx, var in enumerate(alpha.vars):
             if var[0].islower() and var in theta.keys(): #theta.has_key(var)
@@ -176,15 +188,6 @@ class FOLBC:
                 break
         return nalpha
 
-    def sub(self, goal, theta):
-        for idx, var in enumerate(goal.vars):
-            if var in theta.keys():
-                goal.vars[idx] = theta.get(var)
-        goal.value = True
-        for var in goal.vars:
-            if var[0].islower():
-                goal.value = False
-                break
 
 class KB:
 
@@ -213,5 +216,5 @@ class KB:
         return False
 
 #s = Solution(sys.argv[2])
-s = Solution("sample01.txt")
+s = Solution("sample03.txt")
 s.main()

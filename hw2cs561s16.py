@@ -74,7 +74,13 @@ class Predicate:
         self.value = value
 
     def match(self, other):
-        return self.name == other.name
+        if self.name == other.name and len(self.vars) == len(other.vars):
+            for i in range(len(self.vars)):
+                if self.vars[i][0].isupper() and other.vars[i][0].isupper() and self.vars[i] != other.vars[i]:
+                    return False
+            return True
+        else:
+            return False
 
     def __eq__(self, other):
         return self.name == other.name and self.vars == other.vars and self.negation == other.negation
@@ -100,113 +106,93 @@ class FOLBC:
         self.buffer = ""
 
     def BCask(self, kb, query):
-        ans = self.BCAnd(kb, query, {})
-        self.buffer += str(ans[0])
+        for q in query:
+            try:
+                next(self.BCOr(kb, q, {}))
+            except StopIteration:
+                self.buffer += "False"
+                return
+        self.buffer += "True"
 
     def BCOr(self, kb, goal, theta):
         hasImp = False
-        if kb.matchGoal(goal):
-            self.buffer += "Ask: " + goal.toString() + "\n"
-            self.buffer += "True: " + goal.toString() + "\n"
-            return [True, theta]
+        hasYield = False
 
         for imp in self.fetch(kb, goal):
-            imp = copy.deepcopy(imp)
+            hasImp = True
+            hasYield = False
             self.buffer += "Ask: " + goal.toString() + "\n"
+            imp = copy.deepcopy(imp)
             self.standardize(imp, goal, theta)
             newTheta = self.unify(imp.rhs.vars, goal.vars, copy.deepcopy(theta))
-            ans = self.BCAnd(kb, imp.lhs, dict(theta, **newTheta))
-            hasImp = ans[0]
-            subs = ans[1]
-            goal = self.subst(subs, goal)
-            tempsub = self.subst(subs, imp.rhs)
-            if goal != tempsub:
-                hasImp = False
-            if hasImp:
-                self.buffer += "True: " + goal.toString() + "\n"
-                return [True, subs]
+            for ans in self.BCAnd(kb, imp.lhs, dict(theta, **newTheta)):
+                tempgoal = self.subst(ans, goal)
+                tempsub = self.subst(ans, imp.rhs)
+                if tempgoal == tempsub:
+                    self.buffer += "True: " + tempgoal.toString() + "\n"
+                    hasYield = True
+                    yield ans
+                else:
+                    self.buffer += "False: " + tempgoal.toString() + "\n"
 
         if not hasImp:
+            self.buffer += "Ask: " + goal.toString() + "\n"
             self.buffer += "False: " + goal.toString() + "\n"
-            return [False, theta]
+        if hasImp and not hasYield:
+            self.buffer += "False: " + goal.toString() + "\n"
 
     def BCAnd(self, kb, goals, theta):
         if len(goals) == 0:
-            return [True, theta]
-        first = goals[0]
-        rest = goals[1:]
-        ans1 = self.BCOr(kb, self.subst(theta, first), theta)
-        if ans1[0]:
-            ans2 = self.BCAnd(kb, rest, ans1[1])
-            return [ans2[0], ans2[1]]
+            yield theta
         else:
-            return [False, theta]
+            first = goals[0]
+            rest = goals[1:]
+
+            for theta1 in self.BCOr(kb, self.subst(theta, first), theta):
+                for theta2 in self.BCAnd(kb, rest, theta1):
+                    yield theta2
 
     def fetch(self, kb, goal):
-        res = []
         for imp in kb.implications:
             if imp.rhs.match(goal):
-                res.append(imp)
+                yield imp
         for pre in kb.predicates:
             if pre.match(goal):
-                res.append(Implication([], pre))
-        return res
-    '''
-    def standardize(self, imp, goal, theta):
-        if theta is None:
-            return
-        map = {}
-        for idx, var in enumerate(goal.vars):
-            if var[0].islower() and imp.rhs.vars[idx][0].islower():
-                map[imp.rhs.vars[idx]] = var
-                imp.rhs.vars[idx] = var
-            if var in theta.values():
-                map[imp.rhs.vars[idx]] = list(theta.keys())[list(theta.values()).index(var)]
-                if imp.rhs.vars[idx][0].islower():
-                    imp.rhs.vars[idx] = list(theta.keys())[list(theta.values()).index(var)]
-        for i in range(len(imp.lhs)):
-            for j in range(len(imp.lhs[i].vars)):
-                if imp.lhs[i].vars[j] in map.keys() and imp.lhs[i].vars[j][0].islower():
-                    imp.lhs[i].vars[j] = map.get(imp.lhs[i].vars[j])
-    '''
+                yield Implication([], pre)
 
     def standardize(self, imp, goal, theta):
-        if theta is None:
-            return
         map = {}
         set = []
-        for idx in range(len(goal.vars)):
-            if goal.vars[idx][0].islower() and set.__contains__(goal.vars[idx]):
-                goal.vars[idx] = imp.rhs.vars[idx]
-            elif goal.vars[idx][0].islower() and imp.rhs.vars[idx][0].islower():
-                map[imp.rhs.vars[idx]] = goal.vars[idx]
-                imp.rhs.vars[idx] = goal.vars[idx]
-                set.append(goal.vars[idx])
-            elif goal.vars[idx] in theta.values():
-                map[imp.rhs.vars[idx]] = list(theta.keys())[list(theta.values()).index(goal.vars[idx])]
+        tempgoal = copy.deepcopy(goal)
+        for idx, var in enumerate(tempgoal.vars):
+            if var[0].islower():
                 if imp.rhs.vars[idx][0].islower():
-                    imp.rhs.vars[idx] = list(theta.keys())[list(theta.values()).index(goal.vars[idx])]
-            if goal.vars[idx][0].islower():
-                set.append(goal.vars[idx])
-            elif imp.rhs.vars[idx][0].islower():
-                set.append(imp.rhs.vars[idx])
+                    map[imp.rhs.vars[idx]] = tempgoal.vars[idx]
+                    imp.rhs.vars[idx] = tempgoal.vars[idx]
+                set.append(tempgoal.vars[idx])
+            elif var in theta.values():
+                tempgoal.vars[idx] = list(theta.keys())[list(theta.values()).index(var)]
+                if imp.rhs.vars[idx][0].islower():
+                    map[imp.rhs.vars[idx]] = tempgoal.vars[idx]
+                    imp.rhs.vars[idx] = tempgoal.vars[idx]
+                set.append(tempgoal.vars[idx])
+        for idx, var in enumerate(tempgoal.vars):
+            if var[0].isupper() and imp.rhs.vars[idx][0].islower():
+                var = imp.rhs.vars[idx]
+                while imp.rhs.vars[idx] in set:
+                    imp.rhs.vars[idx] = chr(ord(imp.rhs.vars[idx])-ord('a')+1 % 26 + ord('a'))
+                map[var] = imp.rhs.vars[idx]
         for i in range(len(imp.lhs)):
             for j in range(len(imp.lhs[i].vars)):
-                if imp.lhs[i].vars[j] in map.keys() and imp.lhs[i].vars[j][0].islower():
+                if imp.lhs[i].vars[j] in map.keys():
                     imp.lhs[i].vars[j] = map.get(imp.lhs[i].vars[j])
+                else:
+                    var = imp.lhs[i].vars[j]
+                    while imp.lhs[i].vars[j] in set:
+                        imp.lhs[i].vars[j] = chr((ord(imp.lhs[i].vars[j])-ord('a')+1) % 26 + ord('a'))
+                    map[var] = imp.lhs[i].vars[j]
+                    set.append(map[var])
 
-    '''
-    def unify(self, rhs, goal):
-        newTheta = {}
-        for idx in range(len(goal.vars)):
-            if goal.vars[idx][0].islower() and rhs.vars[idx][0].isupper():
-                newTheta[goal.vars[idx]] = rhs.vars[idx]
-                goal.vars[idx] = rhs.vars[idx]
-            elif goal.vars[idx][0].isupper() and rhs.vars[idx][0].islower():
-                newTheta[rhs.vars[idx]] = goal.vars[idx]
-                rhs.vars[idx] = goal.vars[idx]
-        return newTheta
-    '''
     def unify(self, rhs, goal, theta):
         if rhs == goal:
             return theta
@@ -265,12 +251,6 @@ class KB:
     def storeSubstitution(self, substitution):
         self.substitutions += substitution
 
-    def matchGoal(self, goal):
-        for pre in self.predicates:
-            if pre == goal:
-                return True
-        return False
-
-#s = Solution(sys.argv[2])
-s = Solution("sample04.txt")
+s = Solution(sys.argv[2])
+#s = Solution("sample01.txt")
 s.main()

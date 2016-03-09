@@ -1,21 +1,21 @@
-from collections import Set
 import copy
 import sys
 
 __author__ = 'Martin'
+
 
 class Solution:
 
     def __init__(self, filename):
         self.filename = filename
 
-    def main(self,):
+    def main(self):
         f = FIO()
-        s = FOLBC()
+        fol = FOLBC()
         kb = KB()
         f.read(self.filename, kb)
-        s.BCask(kb, kb.goals)
-        f.write("output.txt", s.buffer)
+        fol.BCask(kb, kb.goals)
+        f.write("output.txt", fol.buffer)
 
 
 class FIO:
@@ -67,11 +67,10 @@ class FIO:
 
 
 class Predicate:
-    def __init__(self, name, vars, negation = False, value = False):
+    def __init__(self, name, vars, negation = False):
         self.name = name
         self.vars = vars
         self.negation = negation
-        self.value = value
 
     def match(self, other):
         if self.name == other.name and len(self.vars) == len(other.vars):
@@ -94,6 +93,7 @@ class Predicate:
         varPart = ", ".join(varSegements)
         return negPart + namePart + "(" + varPart + ")"
 
+
 class Implication:
     def __init__(self, lhs, rhs):
         self.lhs = lhs
@@ -108,32 +108,32 @@ class FOLBC:
     def BCask(self, kb, query):
         for q in query:
             try:
-                next(self.BCOr(kb, q, {}))
+                next(self.BCOr(kb, q, {}, []))
             except StopIteration:
                 self.buffer += "False"
                 return
         self.buffer += "True"
 
-    def BCOr(self, kb, goal, theta):
+    def BCOr(self, kb, goal, theta, stack):
         hasImp = False
         hasYield = False
 
-        for imp in self.fetch(kb, goal):
+        for imp in FOLBC.fetch(kb, goal, stack):
             hasImp = True
             hasYield = False
             self.buffer += "Ask: " + goal.toString() + "\n"
             imp = copy.deepcopy(imp)
-            self.standardize(imp, goal, theta)
+            FOLBC.standardize(imp, goal, theta)
             newTheta = self.unify(imp.rhs.vars, goal.vars, copy.deepcopy(theta))
-            for ans in self.BCAnd(kb, imp.lhs, dict(theta, **newTheta)):
+            for ans in self.BCAnd(kb, imp.lhs, dict(theta, **newTheta), stack):
                 tempgoal = self.subst(ans, goal)
                 tempsub = self.subst(ans, imp.rhs)
                 if tempgoal == tempsub:
                     self.buffer += "True: " + tempgoal.toString() + "\n"
                     hasYield = True
                     yield ans
-                else:
-                    self.buffer += "False: " + tempgoal.toString() + "\n"
+            if len(imp.lhs) != 0:
+                stack.pop()
 
         if not hasImp:
             self.buffer += "Ask: " + goal.toString() + "\n"
@@ -141,26 +141,31 @@ class FOLBC:
         if hasImp and not hasYield:
             self.buffer += "False: " + goal.toString() + "\n"
 
-    def BCAnd(self, kb, goals, theta):
+    def BCAnd(self, kb, goals, theta, stack):
         if len(goals) == 0:
             yield theta
         else:
             first = goals[0]
             rest = goals[1:]
 
-            for theta1 in self.BCOr(kb, self.subst(theta, first), theta):
-                for theta2 in self.BCAnd(kb, rest, theta1):
+            for theta1 in self.BCOr(kb, self.subst(theta, first), theta, copy.deepcopy(stack)):
+                for theta2 in self.BCAnd(kb, rest, theta1, copy.deepcopy(stack)):
                     yield theta2
 
-    def fetch(self, kb, goal):
+    @staticmethod
+    def fetch(kb, goal, stack):
+        i = 0
         for imp in kb.implications:
-            if imp.rhs.match(goal):
+            if imp.rhs.match(goal) and i not in stack:
+                stack.append(i)
                 yield imp
+            i += 1
         for pre in kb.predicates:
             if pre.match(goal):
                 yield Implication([], pre)
 
-    def standardize(self, imp, goal, theta):
+    @staticmethod
+    def standardize(imp, goal, theta):
         map = {}
         set = []
         tempgoal = copy.deepcopy(goal)
@@ -251,6 +256,6 @@ class KB:
     def storeSubstitution(self, substitution):
         self.substitutions += substitution
 
-s = Solution(sys.argv[2])
-#s = Solution("sample01.txt")
+#s = Solution(sys.argv[2])
+s = Solution("sample04.txt")
 s.main()

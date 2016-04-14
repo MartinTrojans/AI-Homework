@@ -14,11 +14,21 @@ class Main:
         kb = KB()
         f.read(self.fileName, kb)
         enum = Enum()
+        dm = DM()
 
         for p in kb.P:
-            kb.addBuffer(enum.enumAsk(p, kb))
+            kb.addBufferP(enum.enumAsk(p, kb))
+
+
+        for eu in kb.EU:
+            kb.addBufferEU(dm.EU(eu, kb))
+
+        for meu in kb.MEU:
+            kb.addBufferMEU(dm.MEU(meu, kb))
 
         f.write(kb)
+
+
 
 
 
@@ -52,7 +62,11 @@ class FIO:
                     if newLine == '':
                         break
             else:
-                n.value.append(float(newLine))
+                if newLine == 'decision':
+                    n.decision = True
+                    n.value.append(1) #unknown
+                else:
+                    n.value.append(float(newLine))
                 n.bools.append(None)
                 newLine = file.readline().strip()
             kb.tree.append(n)
@@ -63,8 +77,20 @@ class FIO:
             else:
                 newLine = file.readline().strip()#if there exist nextline
 
-        #newLine = file.readline().strip()
-        #while newLine != "******":
+        newLine = file.readline().strip()
+        while newLine != '':
+            names = newLine.split(" | ")
+            newLine = file.readline().strip()
+            n = Node(names[0])
+            n.parent = names[1].strip().split(" ")
+            while newLine != "***":
+                strs = newLine.split(" ")
+                n.value.append(float(strs[0]))
+                n.bools.append("".join(strs[1:]))
+                newLine = file.readline().strip()
+                if newLine == '':
+                    break
+            kb.tree.append(n)
 
         file.close()
 
@@ -98,7 +124,6 @@ class FIO:
         return expression
 
 
-
     def write(self, kb):
         file = open("output.txt", "w")
         file.write(kb.buffer[:len(kb.buffer)-1])    #delete the final \n
@@ -107,13 +132,13 @@ class FIO:
 
 class Node:
 
-
     def __init__(self, name):
         self.name = name
         self.value = []
         self.bools = []
         self.parent = []
         self.child = []
+        self.decision = False
 
 class Expression:
 
@@ -132,9 +157,17 @@ class KB:
         self.MEU = []
         self.buffer = ""
 
-    def addBuffer(self, list):
-        for ele in list:
-            self.buffer += str("%.2f" % ele) + " "
+    def addBufferP(self, ele):
+        self.buffer += str("%.2f" % ele)
+        self.buffer += "\n"
+
+    def addBufferEU(self, ele):
+        self.buffer += str("%.f" % ele)
+        self.buffer += "\n"
+
+    def addBufferMEU(self, list):
+        self.buffer += " ".join(list[0]) + " "
+        self.buffer += str("%.f" % list[1])
         self.buffer += "\n"
 
 
@@ -143,41 +176,31 @@ class Enum:
     def enumAsk(self, p, kb):
         q = []
         res = []
-        self.enum(p.value, 0, [], res)
+        res.append(p.value)
+        self.enum(len(p.value), 0, [], res)
         for array in res:
             ex = {}
-            px = {}
             for i in range(len(array)):
                 ex[p.name[i]] = array[i]
             for i in range(len(p.parent)):
                 ex[p.parent[i]] = p.pvalues[i]
-                px[p.parent[i]] = p.pvalues[i]
-            q.append(self.enumAll(kb.tree, ex, px))
-            print("end")
+            q.append(self.enumAll(kb.tree, ex))
         return self.normorlize(q)
 
-    def enumAll(self, vars, ex, px):
+    def enumAll(self, vars, ex):
         if len(vars) == 0:
             return 1.0
         vars = copy.deepcopy(vars)
         y = vars.pop(0)
-        if px.get(y.name) != None:
-            return self.enumAll(vars, copy.deepcopy(ex), px)
+        if y.name == "utility":
+            return 1.0
         if ex.get(y.name) != None:
-            yy = self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex), px)
-            print(ex)
-            print(y.name + " " + str(self.conP(y, ex)) + " " + str(yy))
-            return yy
+            return self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex))
         else:
             ex[y.name] = True
-            y1 = self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex), px)
-            print(ex)
-            print(y.name + " " + str(self.conP(y, ex)) + " " + str(y1))
+            y1 = self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex))
             ex[y.name] = False
-            y2 = self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex), px)
-            print(ex)
-            print(y.name + " " + str(self.conP(y, ex)) + " " + str(y2))
-            print(y.name + " " + str(self.conP(y, ex)) + " " + str(y1+y2))
+            y2 = self.conP(y, ex) * self.enumAll(vars, copy.deepcopy(ex))
             return y1 + y2
 
     def conP(self, y, ex):
@@ -195,15 +218,14 @@ class Enum:
             elif ex.get(y.name) == False:
                 return 1 - y.value[y.bools.index(bools)]
 
-    def enum(self, array, i, temp, res):
-        if i == len(array):
-            res.append(temp)
+
+    def enum(self, len, i, temp, res):
+        if i == len:
+            if not res.__contains__(temp):
+                res.append(temp)
             return
-        if array[i] == None:
-            self.enum(array, i+1, copy.deepcopy(temp + [True]), res)  #does it need deepcopy
-            self.enum(array, i+1, copy.deepcopy(temp + [False]), res)
-        else:
-            self.enum(array, i+1, temp + [array[i]], res)
+        self.enum(len, i+1, copy.deepcopy(temp + [True]), res)  #does it need deepcopy
+        self.enum(len, i+1, copy.deepcopy(temp + [False]), res)
 
 
     def normorlize(self, q):
@@ -212,13 +234,69 @@ class Enum:
         sum = 0
         for num in q:
             sum += num
-        for i in range(len(q)):
-            q[i] /= sum
-        return q
+        if sum == 0:
+            return 0
+        return q[0]/sum
 
 
+class DM:
+    def EU(self, eu, kb):
+        enum = Enum()
+        value = 0
+        for treeNode in kb.tree:
+            if treeNode.decision:
+                for i, decisionName in enumerate(eu.name):
+                    if treeNode.name == decisionName:
+                        if eu.value[i]:
+                            treeNode.value[0] = 1
+                        else:
+                            treeNode.value[0] = 0
+            if treeNode.name == "utility": #it's the final node or not exsit
+                for i, boolStr in enumerate(treeNode.bools):
+                    expression = Expression()
+                    expression.name = treeNode.parent
+                    expression.parent = eu.parent
+                    expression.pvalues = eu.pvalues
+                    for ch in boolStr:
+                        if ch == '+':
+                            expression.value.append(True)
+                        elif ch == '-':
+                            expression.value.append(False)
+                    value += enum.enumAsk(expression, kb) * treeNode.value[i]
+        return value
+
+    def MEU(self, meu, kb):
+        tempRes = []
+        max = -float('Inf')
+        self.enumBools(len(meu.name), 0, [], tempRes)
+        for boolVal in tempRes:
+            eu = Expression()
+            eu.name = meu.name
+            eu.value = boolVal
+            eu.parent = meu.parent
+            eu.pvalues = meu.pvalues
+            newValue = self.EU(eu, kb)
+            if newValue > max:
+                max = newValue
+                decision = boolVal
+        resPart1 = []
+        for des in decision:
+            if des:
+                resPart1.append('+')
+            else:
+                resPart1.append('-')
+        res = []
+        res.append(resPart1)
+        res.append(max)
+        return res
+
+    def enumBools(self, len, i, temp, res):
+        if i == len:
+            res.append(temp)
+            return
+        self.enumBools(len, i+1, copy.deepcopy(temp + [True]), res)  #does it need deepcopy
+        self.enumBools(len, i+1, copy.deepcopy(temp + [False]), res)
 
 
-
-main = Main("sample04.txt")
+main = Main("sample03.txt")
 main.main()

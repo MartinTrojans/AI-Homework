@@ -178,6 +178,14 @@ class Enum:
         res = []
         res.append(p.value)
         self.enum(len(p.value), 0, [], res)
+        for treeNode in kb.tree:
+            if treeNode.decision:
+                for i, decisionName in enumerate(p.parent):
+                    if treeNode.name == decisionName:
+                        if p.pvalues[i]:
+                            treeNode.value[0] = 1
+                        else:
+                            treeNode.value[0] = 0
         for array in res:
             ex = {}
             for i in range(len(array)):
@@ -298,5 +306,5 @@ class DM:
         self.enumBools(len, i+1, copy.deepcopy(temp + [False]), res)
 
 
-main = Main("sample03.txt")
+main = Main("sample05.txt")
 main.main()

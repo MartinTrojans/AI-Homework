@@ -2,6 +2,7 @@ __author__ = 'Martin'
 
 import sys
 import copy
+from decimal import Decimal
 
 class Main:
 
@@ -155,17 +156,14 @@ class KB:
         self.buffer = ""
 
     def addBufferP(self, ele):
-        self.buffer += str("%.2f" % ele)
-        self.buffer += "\n"
+        self.buffer += str(Decimal(str(ele)).quantize(Decimal('.01'))) + "\n"
 
     def addBufferEU(self, ele):
-        self.buffer += str("%.f" % ele)
-        self.buffer += "\n"
+        self.buffer += str(Decimal(str(ele)).quantize(Decimal('0.'))) + "\n"
 
     def addBufferMEU(self, list):
         self.buffer += " ".join(list[0]) + " "
-        self.buffer += str("%.f" % list[1])
-        self.buffer += "\n"
+        self.buffer += str(Decimal(str(list[1])).quantize(Decimal('0.'))) + "\n"
 
 
 # don't use the algorithm of the textbook

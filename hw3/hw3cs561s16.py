@@ -29,9 +29,6 @@ class Main:
         f.write(kb)
 
 
-
-
-
 class FIO:
     def read(self, fileName, kb):
         file = open(fileName, "r")
@@ -306,5 +303,5 @@ class DM:
         self.enumBools(len, i+1, copy.deepcopy(temp + [False]), res)
 
 
-main = Main("sample05.txt")
+main = Main(sys.argv[2])
 main.main()
